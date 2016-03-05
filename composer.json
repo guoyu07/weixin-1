@@ -1,0 +1,15 @@
+{
+    "name": "pakey/weixin",
+    "description": "最简单的微信类库",
+    "license": "MIT",
+    "authors": [
+        {
+            "name": "pakey",
+            "email": "pakey@qq.com"
+        }
+    ],
+    "require": {
+        "php":">=5.5.0",
+        "pakey/tool":""
+    }
+}
