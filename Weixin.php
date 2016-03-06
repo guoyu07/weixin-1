@@ -24,12 +24,12 @@ class weixin
      *
      * @var string
      */
-    protected $app_id;
+    protected $appId;
 
     /**
      * @var string
      */
-    protected $app_secret;
+    protected $appSecret;
 
     /**
      * @var string
@@ -38,21 +38,21 @@ class weixin
 
     const API_TOKEN_GET = 'https://api.weixin.qq.com/cgi-bin/token';
 
-    public function __construct($app_id, $app_secret)
+    public function __construct($appId, $appSecret)
     {
-        $this->app_id     = $app_id;
-        $this->app_secret = $app_secret;
+        $this->appId     = $appId;
+        $this->appSecret = $appSecret;
     }
 
     /**
-     * @param $app_id
-     * @param $app_secret
+     * @param $appId
+     * @param $appSecret
      * @return static
      */
-    public static function getInstance($app_id, $app_secret)
+    public static function getInstance($appId, $appSecret)
     {
         if (!static::$_instance instanceof static) {
-            static::$_instance = new static($app_id, $app_secret);
+            static::$_instance = new static($appId, $appSecret);
         }
         return static::$_instance;
     }
@@ -60,7 +60,7 @@ class weixin
 
     public function getToken($forceRefresh = 0)
     {
-        $cacheKey = 'accesstoken_' . $this->app_id;
+        $cacheKey = 'pakey_weixin_accesstoken_' . $this->appId;
         $data     = Cache::get($cacheKey);
         if ($forceRefresh || empty($data)) {
             $token = $this->_getTokenFromServer();
@@ -74,13 +74,13 @@ class weixin
     protected function _getTokenFromServer()
     {
         $params = [
-            'appid' => $this->app_id,
-            'secret' => $this->app_secret,
+            'appid' => $this->appId,
+            'secret' => $this->appSecret,
             'grant_type' => 'client_credential',
         ];
         $token = $this->parseJSON(Http::get(self::API_TOKEN_GET, $params));
         if (empty($token['access_token'])) {
-            throw new HttpException('Request AccessToken fail. response: '.json_encode($token, JSON_UNESCAPED_UNICODE));
+            trigger_error('Request AccessToken fail. response: '.json_encode($token, JSON_UNESCAPED_UNICODE),E_USER_ERROR);
         }
         return $token;
     }

@@ -2,7 +2,11 @@
 
 namespace pakey\weixin;
 
-use pakey\weixin\Weixin;
+use pakey\tool\Url;
+use pakey\tool\Http;
+use think\exception\ErrorException;
+use think\Input;
+
 /**
  * 网页授权
  * Class Auth
@@ -12,103 +16,95 @@ use pakey\weixin\Weixin;
  *
  * @package Weixin
  */
-class Auth extends Weixin {
+class Oauth extends Weixin
+{
 
     public $user;
 
     protected $lastPermission;
 
-    const API_USER = 'https://api.weixin.qq.com/sns/userinfo';
-    const API_TOKEN_GET = 'https://api.weixin.qq.com/sns/oauth2/access_token';
-    const API_TOKEN_REFRESH = 'https://api.weixin.qq.com/sns/oauth2/refresh_token';
+    protected $authorizedUser;
+
+    const API_USER           = 'https://api.weixin.qq.com/sns/userinfo';
+    const API_TOKEN_GET      = 'https://api.weixin.qq.com/sns/oauth2/access_token';
+    const API_TOKEN_REFRESH  = 'https://api.weixin.qq.com/sns/oauth2/refresh_token';
     const API_TOKEN_VALIDATE = 'https://api.weixin.qq.com/sns/auth';
-    const API_URL = 'https://open.weixin.qq.com/connect/oauth2/authorize';
+    const API_URL            = 'https://open.weixin.qq.com/connect/oauth2/authorize';
 
 
     /**
-     * 前往api服务器进行授权
+     * 生成outh URL
      *
-     * @param null $plat
+     * @param string $to
+     * @param string $scope
+     * @param string $state
+     *
+     * @return string
      */
-    public function toapi($plat = null) {
-        if ($plat === null) {
-            $param = 'id=' . $this->app_id;
-        } elseif (is_numeric($plat)) {
-            $param = 'plat=' . $plat;
-        } else {
-            $param = 'id=' . $this->$plat;
-        }
-        $url = \Tool_Url::current();
-        $url .= (strpos($url, '?') ? '&' : '?') . 'wxauthnoredirect=1';
-        header('Location:' . self::API_DUDU_AUTH . '?' . $param . '&url=' . rawurlencode(base64_encode($url)));
+    public function url($to = null, $scope = 'snsapi_userinfo', $state = 'STATE')
+    {
+        $to !== null || $to = Url::current();
+        $params = array(
+            'appid'         => $this->appId,
+            'redirect_uri'  => $to,
+            'response_type' => 'code',
+            'scope'         => $scope,
+            'state'         => $state,
+        );
+        return self::API_URL . '?' . http_build_query($params) . '#wechat_redirect';
+    }
+
+    /**
+     * 直接跳转
+     *
+     * @param string $to
+     * @param string $scope
+     * @param string $state
+     */
+    public function redirect($to = null, $scope = 'snsapi_userinfo', $state = 'STATE')
+    {
+        header('Location:' . $this->url($to, $scope, $state));
         exit;
     }
 
+
     /**
-     * 通过授权获取用户详细信息
-     *
-     * @param mixed $plat
+     * 获取已授权用户
      *
      * @return mixed
      */
-    public function get_userinfo($plat = null) {
-        if (!$this->user) {
-            if ($this->input->has('error')) {
-                return false;
-            } elseif (!$this->input->has('openid')) {
-                if ($this->input->has('wxauthnoredirect')) {
-                    return false;
-                } else{
-                    $this->toapi($plat);
-                }
-            } else {
-                $openid     = $this->input->get('openid', 'str');
-                $this->user = $this->getUser($openid);
-            }
+    public function user()
+    {
+        if ($this->authorizedUser
+            || !Input::has('state', $_GET)
+            || (!$code = Input::get('code')) && !Input::has('state', $_GET)
+        ) {
+            return $this->authorizedUser;
         }
-        return $this->user;
+        $permission = $this->getAccessPermission($code);
+        if ($permission['scope'] !== 'snsapi_userinfo') {
+            $user = ['openid' => $permission['openid']];
+        } else {
+            $user = $this->getUser($permission['openid'], $permission['access_token']);
+        }
+        return $this->authorizedUser = $user;
     }
 
     /**
-     * 通过授权获取用户openid
-     * get_openid
+     * 通过授权获取用户
      *
-     * @param null $plat
+     * @param string $to
+     * @param string $state
+     * @param string $scope
      *
-     * @return mixed
+     * @return null
      */
-    public function get_openid($plat = null) {
-        if (!$this->user) {
-            if ($this->input->has('error')) {
-                return false;
-            } elseif (!$this->input->has('openid')) {
-                if ($this->input->has('wxauthnoredirect')) {
-                    return false;
-                } else{
-                    $this->toapi($plat);
-                }
-            } else{
-                $this->user['openid'] = $this->input->get('openid', 'str');
-            }
+    public function authorize($to = null, $scope = 'snsapi_userinfo', $state = 'STATE')
+    {
+        if (!Input::has('state', $_GET) && !Input::has('code', $_GET)) {
+            $this->redirect($to, $scope, $state);
         }
-        return $this->user['openid'];
-    }
-
-    /**
-     * 刷新 access_token
-     *
-     * @param string $refreshToken
-     *
-     * @return mixed
-     */
-    public function refresh($refreshToken) {
-        $params = array(
-            'appid'         => $this->app_id,
-            'grant_type'    => 'refresh_token',
-            'refresh_token' => $refreshToken,
-        );
-
-        return $this->get(self::API_TOKEN_REFRESH, $params);
+        return $this->user();
     }
 
     /**
@@ -119,17 +115,37 @@ class Auth extends Weixin {
      *
      * @return boolean
      */
-    public function accessTokenIsValid($accessToken, $openId) {
+    public function accessTokenIsValid($accessToken, $openId)
+    {
         $params = array(
             'openid'       => $openId,
             'access_token' => $accessToken,
         );
         try {
-            $this->get(self::API_TOKEN_VALIDATE, $params);
+            Http::get(self::API_TOKEN_VALIDATE, $params);
             return true;
         } catch (\Exception $e) {
             return false;
         }
+    }
+
+    /**
+     * 刷新 access_token
+     *
+     * @param string $refreshToken
+     *
+     * @return mixed
+     */
+    public function refresh($refreshToken)
+    {
+        $params               = [
+            'appid'         => $this->appId,
+            'grant_type'    => 'refresh_token',
+            'refresh_token' => $refreshToken,
+        ];
+        $permission           = $this->parseJSON(Http::get(self::API_TOKEN_REFRESH, $params));
+        $this->lastPermission = array_merge($this->lastPermission, $permission);
+        return $permission;
     }
 
     /**
@@ -140,14 +156,14 @@ class Auth extends Weixin {
      *
      * @return array
      */
-    public function getUser($openId) {
-
+    public function getUser($openId, $accessToken)
+    {
         $queries = array(
-            'id' => $this->app_id,
+            'access_token' => $accessToken,
             'openid'       => $openId,
+            'lang'         => 'zh_CN',
         );
-
-        return $this->get('http://city.duduapp.net/wxapi/getinfo', $queries);
+        return $this->parseJSON(Http::get(self::API_USER,$queries));
     }
 
     /**
@@ -157,14 +173,18 @@ class Auth extends Weixin {
      *
      * @return string
      */
-    public function getAccessPermission($code) {
+    public function getAccessPermission($code)
+    {
         $params = array(
-            'appid'      => $this->app_id,
-            'secret'     => $this->app_secret,
+            'appid'      => $this->appId,
+            'secret'     => $this->appSecret,
             'code'       => $code,
             'grant_type' => 'authorization_code',
         );
-
-        return $this->lastPermission = $this->get(self::API_TOKEN_GET, $params);
+        $res=$this->parseJSON(Http::post(self::API_TOKEN_GET.'?'.http_build_query($params)));
+        if(isset($res['errorcode'])){
+            trigger_error('get access_token error: '.$res['errormsg'], E_USER_ERROR);
+        }
+        return $this->lastPermission = $res;
     }
 }
