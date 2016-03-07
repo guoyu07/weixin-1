@@ -1,6 +1,7 @@
 {
     "name": "pakey/weixin",
     "description": "最简单的微信类库",
+    "homepage": "https://github.com/pakey/weixin",
     "license": "MIT",
     "authors": [
         {
