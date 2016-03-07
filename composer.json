@@ -11,5 +11,10 @@
     "require": {
         "php":">=5.5.0",
         "pakey/tool":"*"
+    },
+    "autoload": {
+        "psr-4": {
+            "pakey\\": "src/"
+        }
     }
 }
