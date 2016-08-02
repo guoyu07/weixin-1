@@ -3,7 +3,7 @@ namespace pakey\weixin;
 use pakey\tool\Http;
 use think\Cache;
 
-class weixin
+class Weixin
 {
 
     /**
