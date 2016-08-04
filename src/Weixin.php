@@ -1,7 +1,7 @@
 <?php
 namespace pakey\weixin;
 use pakey\tool\Http;
-use think\Cache;
+use ptcms\Cache;
 
 class Weixin
 {

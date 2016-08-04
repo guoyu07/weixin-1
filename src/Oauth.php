@@ -4,8 +4,8 @@ namespace pakey\weixin;
 
 use pakey\tool\Url;
 use pakey\tool\Http;
-use think\exception\ErrorException;
-use think\Input;
+use ptcms\Input;
+use ptcms\Request;
 
 /**
  * 网页授权
@@ -77,7 +77,7 @@ class Oauth extends Weixin
     {
         if ($this->authorizedUser
             || !Input::has('state', $_GET)
-            || (!$code = Input::get('code')) && !Input::has('state', $_GET)
+            || (!$code = Input::get('code','str')) && !Input::has('state', $_GET)
         ) {
             return $this->authorizedUser;
         }

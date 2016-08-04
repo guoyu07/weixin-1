@@ -2,7 +2,7 @@
 
 namespace pakey\weixin;
 
-use think\Cache;
+use ptcms\Cache;
 use pakey\tool\Http;
 use pakey\tool\Url;
 
